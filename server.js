@@ -1,0 +1,136 @@
+require('dotenv').config();
+const express = require('express');
+const mongoose = require('mongoose');
+const cors = require('cors');
+const http = require('http');
+const socketIo = require('socket.io');
+const jwt = require('jsonwebtoken');
+const CryptoJS = require('crypto-js');
+const Message = require('./models/Message');
+const User = require('./models/User');
+const auth = require('./middleware/auth');
+
+const app = express();
+const server = http.createServer(app);
+const io = socketIo(server, {
+  cors: {
+    origin: process.env.CLIENT_URL || "http://localhost:3000",
+    methods: ["GET", "POST"]
+  }
+});
+
+// Middleware
+app.use(cors({
+  origin: process.env.CLIENT_URL || "http://localhost:3000",
+  credentials: true
+}));
+app.use(express.json());
+app.use(express.urlencoded({ extended: true }));
+
+// MongoDB Connection
+mongoose.connect(process.env.MONGODB_URI || 'mongodb://localhost:27017/heartwork', {
+  useNewUrlParser: true,
+  useUnifiedTopology: true
+})
+.then(() => console.log('Connected to MongoDB'))
+.catch(err => console.error('MongoDB connection error:', err));
+
+// Socket.io Authentication Middleware
+io.use((socket, next) => {
+  const token = socket.handshake.auth.token;
+  if (!token) {
+    return next(new Error('Authentication error'));
+  }
+  try {
+    const decoded = jwt.verify(token, process.env.JWT_SECRET);
+    socket.user = decoded;
+    next();
+  } catch (err) {
+    next(new Error('Authentication error'));
+  }
+});
+
+// Socket.io Connection Handler
+io.on('connection', (socket) => {
+  console.log('User connected:', socket.user.id);
+
+  // Join a room for task updates
+  socket.join('todos-room');
+  
+  socket.on('sendMessage', async (message) => {
+    try {
+      // Get user details
+      const user = await User.findById(socket.user.id);
+      if (!user) {
+        throw new Error('User not found');
+      }
+
+      // Encrypt message before storing
+      const encryptedText = CryptoJS.AES.encrypt(
+        message.text,
+        process.env.ENCRYPTION_KEY
+      ).toString();
+
+      // Store encrypted message in database
+      const newMessage = new Message({
+        sender: socket.user.id,
+        encryptedText,
+        timestamp: message.timestamp
+      });
+
+      await newMessage.save();
+
+      // Format message for sending with consistent ID handling
+      const senderId = socket.user.id.toString();
+      const messageToSend = {
+        _id: newMessage._id,
+        text: message.text,
+        sender: senderId,
+        senderName: user.username,
+        timestamp: message.timestamp,
+        isCurrentUser: true
+      };
+
+      // Broadcast message to all clients
+      io.emit('newMessage', messageToSend);
+      console.log('Message sent:', messageToSend);
+    } catch (error) {
+      console.error('Error saving message:', error);
+      socket.emit('error', { message: 'Error sending message' });
+    }
+  });
+
+  socket.on('disconnect', () => {
+    console.log('User disconnected:', socket.user.id);
+  });
+});
+
+// Import routes
+const authRoutes = require('./routes/auth');
+const galleryRoutes = require('./routes/gallery');
+const chatRoutes = require('./routes/chat');
+const notesRoutes = require('./routes/notes');
+const todosRoutes = require('./routes/todos');
+const testRoutes = require('./routes/testRoute');
+
+// Set io instance for todos routes
+todosRoutes.setIo(io);
+
+// Routes
+app.use('/api/auth', authRoutes);
+app.use('/api/gallery', galleryRoutes);
+app.use('/api/chat', chatRoutes);
+app.use('/api/notes', notesRoutes);
+app.use('/api/todos', todosRoutes);
+app.use('/api', testRoutes);
+
+// Error handling middleware
+app.use((err, req, res, next) => {
+  console.error(err.stack);
+  res.status(500).json({ message: 'Something went wrong!' });
+});
+
+const PORT = process.env.PORT || 5000;
+server.listen(PORT, () => {
+  console.log(`Server running on port ${PORT}`);
+}); 
