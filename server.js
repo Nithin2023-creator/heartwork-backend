@@ -1,4 +1,8 @@
+// Load environment variables from our custom file
+require('./dotenv.js');
+// Original dotenv config
 require('dotenv').config();
+
 const express = require('express');
 const mongoose = require('mongoose');
 const cors = require('cors');
@@ -21,14 +25,31 @@ const io = socketIo(server, {
 
 // Middleware
 app.use(cors({
-  origin: process.env.CLIENT_URL || "http://localhost:3000",
-  credentials: true
+  origin: [process.env.CLIENT_URL || "http://localhost:3000", "https://heartwork-frontend.vercel.app"],
+  credentials: true,
+  allowedHeaders: ['Content-Type', 'Authorization', 'x-auth-token', 'Access-Control-Allow-Headers'],
+  methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
+  preflightContinue: false,
+  optionsSuccessStatus: 204
 }));
+
+// Add debug middleware for authentication requests
+app.use('/api/auth', (req, res, next) => {
+  console.log(`Auth request: ${req.method} ${req.url}`);
+  console.log('Headers:', req.headers);
+  next();
+});
+
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
 
+// Simple test route
+app.get('/api/test', (req, res) => {
+  res.json({ message: 'API is running' });
+});
+
 // MongoDB Connection
-mongoose.connect(process.env.MONGODB_URI || 'mongodb://localhost:27017/heartwork', {
+mongoose.connect(process.env.MONGODB_URI || 'mongodb+srv://Project:Florencemidhebaramvesam@project.tbx2krn.mongodb.net/heartwork', {
   useNewUrlParser: true,
   useUnifiedTopology: true
 })
@@ -123,6 +144,11 @@ app.use('/api/chat', chatRoutes);
 app.use('/api/notes', notesRoutes);
 app.use('/api/todos', todosRoutes);
 app.use('/api', testRoutes);
+
+// Add a test route
+app.get('/api/test', (req, res) => {
+  res.json({ message: 'API is working correctly!' });
+});
 
 // Error handling middleware
 app.use((err, req, res, next) => {
