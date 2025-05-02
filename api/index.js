@@ -1,3 +1,5 @@
+// Load environment variables first
+require('../dotenv.js');
 require('dotenv').config();
 const express = require('express');
 const mongoose = require('mongoose');
@@ -22,10 +24,19 @@ app.use(cors({
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
 
+// Add debug middleware for authentication requests
+app.use('/api/auth', (req, res, next) => {
+  console.log(`Auth request: ${req.method} ${req.url}`);
+  console.log('Headers:', req.headers);
+  next();
+});
+
 // MongoDB Connection
-mongoose.connect(process.env.MONGODB_URI || 'mongodb://localhost:27017/heartwork', {
+mongoose.connect(process.env.MONGODB_URI, {
   useNewUrlParser: true,
-  useUnifiedTopology: true
+  useUnifiedTopology: true,
+  serverSelectionTimeoutMS: 15000, // Increase timeout to 15 seconds
+  socketTimeoutMS: 45000 // Increase socket timeout to 45 seconds
 })
 .then(() => console.log('Connected to MongoDB'))
 .catch(err => console.error('MongoDB connection error:', err));
@@ -44,6 +55,7 @@ app.use('/api/auth', require('../routes/auth'));
 app.use('/api/gallery', require('../routes/gallery'));
 app.use('/api/chat', require('../routes/chat'));
 app.use('/api/notes', require('../routes/notes'));
+app.use('/api/todos', require('../routes/todos'));
 
 // Error handling middleware
 app.use((err, req, res, next) => {

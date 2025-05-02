@@ -1,8 +1,8 @@
 // This file manually sets environment variables since we can't create .env files
-process.env.JWT_SECRET = 'your_secret_key_here';
+process.env.JWT_SECRET = 'heartworkSecretKey2024';
 process.env.MONGODB_URI = 'mongodb+srv://Project:Florencemidhebaramvesam@project.tbx2krn.mongodb.net/heartwork';
-process.env.ENCRYPTION_KEY = 'your_encryption_key_here';
-process.env.CLIENT_URL = 'http://localhost:3000';
+process.env.ENCRYPTION_KEY = 'heartworkEncryptionKey2024';
+process.env.CLIENT_URL = 'https://heartwork-frontend.vercel.app';
 
 console.log('Environment variables set:');
 console.log('JWT_SECRET:', process.env.JWT_SECRET ? '******' : 'not set');

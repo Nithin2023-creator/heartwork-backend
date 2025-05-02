@@ -18,14 +18,17 @@ const app = express();
 const server = http.createServer(app);
 const io = socketIo(server, {
   cors: {
-    origin: process.env.CLIENT_URL || "http://localhost:3000",
-    methods: ["GET", "POST"]
-  }
+    origin: ["https://heartwork-frontend.vercel.app", "http://localhost:3000", process.env.CLIENT_URL || "http://localhost:3000"],
+    methods: ["GET", "POST", "PUT", "DELETE"],
+    credentials: true,
+    allowedHeaders: ["Content-Type", "Authorization"]
+  },
+  transports: ['websocket', 'polling']
 });
 
 // Middleware
 app.use(cors({
-  origin: [process.env.CLIENT_URL || "http://localhost:3000", "https://heartwork-frontend.vercel.app"],
+  origin: ["http://localhost:3000", process.env.CLIENT_URL || "http://localhost:3000", "https://heartwork-frontend.vercel.app"],
   credentials: true,
   allowedHeaders: ['Content-Type', 'Authorization', 'x-auth-token', 'Access-Control-Allow-Headers'],
   methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
@@ -60,14 +63,17 @@ mongoose.connect(process.env.MONGODB_URI || 'mongodb+srv://Project:Florencemidhe
 io.use((socket, next) => {
   const token = socket.handshake.auth.token;
   if (!token) {
-    return next(new Error('Authentication error'));
+    console.log('Socket connection rejected: No token provided');
+    return next(new Error('Authentication error: No token provided'));
   }
   try {
     const decoded = jwt.verify(token, process.env.JWT_SECRET);
     socket.user = decoded;
+    console.log('Socket authenticated successfully for user:', decoded.id);
     next();
   } catch (err) {
-    next(new Error('Authentication error'));
+    console.log('Socket authentication failed:', err.message);
+    next(new Error('Authentication error: Invalid token'));
   }
 });
 
